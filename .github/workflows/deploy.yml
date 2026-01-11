@@ -1,27 +1,53 @@
-name: Deploy LLM
+name: Build & Deploy LLM
+
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 0 */14 * *'
+    - cron: "0 0 */14 * *"
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     env:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PAT: ${{ secrets.DOCKER_PAT }}
-      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
       KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
       KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+
     steps:
       - uses: actions/checkout@v3
+
       - name: Set up Python
         uses: actions/setup-python@v4
-        with: python-version: '3.11'
-      - name: Install dependencies
-        run: pip install kaggle docker render-python
-      - name: Download Kaggle checkpoint
+        with:
+          python-version: "3.11"
+
+      - name: Install Python deps
+        run: pip install kaggle
+
+      - name: Download model from Kaggle
         run: |
           mkdir -p /tmp/checkpoint-2814
           kaggle kernels output toocool69/distill-and-final -p /tmp/checkpoint-2814
-      - name: Deploy
+
+      - name: Prepare model artifacts
         run: python deploy.py
+
+      - name: Log in to Docker Hub
+        run: echo "${DOCKER_PAT}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
+
+      - name: Build Docker image
+        run: docker build -t ${DOCKER_USERNAME}/vk-llm:latest .
+
+      - name: Push Docker image
+        run: docker push ${DOCKER_USERNAME}/vk-llm:latest
+
+      - name: Redeploy on Render
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${RENDER_API_KEY}" \
+            -H "Content-Type: application/json" \
+            https://api.render.com/v1/services/${RENDER_SERVICE_ID}/deploys
