@@ -1,0 +1,27 @@
+name: Deploy LLM
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 */14 * *'
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PAT: ${{ secrets.DOCKER_PAT }}
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+      KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with: python-version: '3.11'
+      - name: Install dependencies
+        run: pip install kaggle docker render-python
+      - name: Download Kaggle checkpoint
+        run: |
+          mkdir -p /tmp/checkpoint-2814
+          kaggle kernels output toocool69/distill-and-final -p /tmp/checkpoint-2814
+      - name: Deploy
+        run: python deploy.py
